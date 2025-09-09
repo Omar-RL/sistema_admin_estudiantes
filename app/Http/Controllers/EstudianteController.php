@@ -3,64 +3,98 @@
 namespace App\Http\Controllers;
 
 use App\Models\Estudiante;
+use App\Models\Curso;
 use Illuminate\Http\Request;
 
 class EstudianteController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Mostrar la lista de estudiantes
      */
     public function index()
     {
-        $estudiantes= Estudiante::all();
-        return view('estudiantes.index')->with('estudiantes',$estudiantes);
+        $estudiantes = Estudiante::with('cursos')->get();
+        return view('estudiantes.index', compact('estudiantes'));
     }
 
     /**
-     * Show the form for creating a new resource.
+     * Mostrar el formulario para crear un nuevo estudiante
      */
     public function create()
     {
-        //
+        $cursos = Curso::all(); // Para elegir cursos al crear
+        return view('estudiantes.create', compact('cursos'));
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Guardar un nuevo estudiante en la BD
      */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'nombre' => 'required|string|max:100',
+            'apellido' => 'required|string|max:100',
+            'email' => 'required|email|unique:estudiantes,email',
+            'cursos' => 'array'
+        ]);
+
+        $estudiante = Estudiante::create($request->only(['nombre', 'apellido', 'email']));
+        
+        // Asociar cursos seleccionados
+        if ($request->has('cursos')) {
+            $estudiante->cursos()->attach($request->cursos);
+        }
+
+        return redirect()->route('estudiantes.index')->with('success', 'Estudiante creado correctamente');
     }
 
     /**
-     * Display the specified resource.
+     * Mostrar detalles de un estudiante
      */
-    public function show(Estudiante $estudiante)
+    public function show($id)
     {
-        //
+        $estudiante = Estudiante::with('cursos')->findOrFail($id);
+        return view('estudiantes.show', compact('estudiante'));
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Mostrar formulario para editar un estudiante
      */
-    public function edit(Estudiante $estudiante)
+    public function edit($id)
     {
-        //
+        $estudiante = Estudiante::with('cursos')->findOrFail($id);
+        $cursos = Curso::all();
+        return view('estudiantes.edit', compact('estudiante', 'cursos'));
     }
 
     /**
-     * Update the specified resource in storage.
+     * Actualizar estudiante en la BD
      */
-    public function update(Request $request, Estudiante $estudiante)
+    public function update(Request $request, $id)
     {
-        //
+        $request->validate([
+            'nombre' => 'required|string|max:100',
+            'apellido' => 'required|string|max:100',
+            'email' => 'required|email|unique:estudiantes,email,' . $id,
+            'cursos' => 'array'
+        ]);
+
+        $estudiante = Estudiante::findOrFail($id);
+        $estudiante->update($request->only(['nombre', 'apellido', 'email']));
+
+        // Sincronizar cursos
+        $estudiante->cursos()->sync($request->cursos ?? []);
+
+        return redirect()->route('estudiantes.index')->with('success', 'Estudiante actualizado correctamente');
     }
 
     /**
-     * Remove the specified resource from storage.
+     * Eliminar estudiante
      */
-    public function destroy(Estudiante $estudiante)
+    public function destroy($id)
     {
-        //
+        $estudiante = Estudiante::findOrFail($id);
+        $estudiante->delete();
+        return redirect()->route('estudiantes.index')->with('success', 'Estudiante eliminado correctamente');
     }
 }
